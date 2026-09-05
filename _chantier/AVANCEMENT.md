@@ -5208,3 +5208,91 @@ mp-103, mp-129.
 - `stabilite_par_cas` **refuse de rendre un chiffre sur un journal tronque**. Il a rendu
   « toujours 16, jamais 2 » sur 113 cas attendus : une sortie `kubectl` interrompue, et
   un resultat qui avait l'air d'un resultat.
+
+---
+
+## L4.1 (suite) — ce que le modele fait vraiment de ses outils
+
+**05/09/2026, meme branche.** Le lot etait clos sur ses reglages ; le diagnostic des
+cas restants a ouvert une autre question, et il fallait la mener.
+
+### Le compteur ratait encore une reponse juste sur vingt
+
+Sur les dix cas ou l'article etait SERVI et non CITE, cinq au moins etaient des
+reponses exactes que le compteur ne reconnaissait pas :
+
+    mp-013  attendu « CCAG Travaux 4 »   -> « l'article 4.1 du CCAG Travaux »
+    mp-127  attendu « CCAG Travaux 41 »  -> « l'article 41.1 du CCAG Travaux »
+
+Le corpus NOMME ses articles comme il les indexe ; un redacteur ecrit la forme du
+metier. `articles_cites` rapproche desormais les deux — nom du cahier a moins de 60
+caracteres du numero, et refus si un autre cahier s'interpose, le corpus en portant
+quatre dont les articles portent les memes numeros.
+
+**Ce n'etait pas qu'un defaut de mesure** : le garde-fou s'en sert, et remplacait donc
+par un refus une reponse juste citant un CCAG. Un test figeait ce defaut « pour que sa
+correction soit visible » ; elle l'est.
+
+Recomptees sans rien relancer, les quatre campagnes du jour gagnaient de quatre a sept
+reponses justes chacune. **Quatrieme fois qu'un compteur decide d'un diagnostic**, et
+quatrieme fois qu'il sous-estimait.
+
+### Les outils, enfin observables
+
+L'Orchestrateur ne journalisait QUE les outils destructifs. On ne pouvait donc pas dire
+ce que le modele emploie. Chaque appel laisse desormais une trace, et la premiere
+campagne a repondu :
+
+    252  search_documents : ok
+    228  fetch_document   : ok      (aucun echec)
+    222  list_documents   : ok
+
+**La conjecture etait fausse** : le modele va bien chercher les documents. Mais
+`fetch_document` ne rendait que le DEBUT du fichier, tronque a 3000 caracteres, quand
+98 documents sur 108 depassent ce seuil. Un passage situe au milieu restait
+inatteignable QUELLE QUE SOIT la valeur de `max_chars` — et le modele insistait
+pourtant : 74 appels a 5 000, 13 a 10 000.
+
+### `section` : la capacite est juste, le modele ne s'en sert pas
+
+Ajoutee, decrite, transmise — le schema OpenAI la porte, verifie. Puis annoncee dans la
+reponse tronquee elle-meme, au motif que le modele lit le RESULTAT d'un outil et non sa
+description. Deux campagnes contre deux :
+
+    228 appels a fetch_document, ZERO avec section
+    p = 0,69 / 0,51 / 1,00 / 0,34
+
+Le modele n'en a pas besoin : il tient ses passages de `search_documents`, qui rend
+deja leur section, et n'emploie `fetch_document` que pour elargir autour.
+
+L'annonce dans la reponse coutait des jetons a chaque troncature pour un effet nul :
+elle est retiree. Le parametre reste — il ne coute rien tant qu'on ne l'emploie pas, et
+le defaut qu'il repare est reel. **C'est une exception assumee a la regle du retrait**,
+et elle tient a une difference : l'elargissement aux voisins CHANGEAIT ce qui etait
+servi a chaque requete ; `section` est inerte.
+
+### Etat a la fin
+
+    agregat                   103, 98 /113
+    article servi TOUJOURS    103   parfois 1   jamais 9
+    article cite  TOUJOURS     96   parfois 9   jamais 8
+
+Point de depart du chantier, deux jours plus tot : 52/113.
+
+### Une garde de plus, apprise a ses depens
+
+Un `helm upgrade` est tombe PENDANT une campagne : treize questions ont echoue au
+redemarrage, et le harnais a affiche « 96/107 » sans dire qu'il manquait treize cas ni
+que les autres se partageaient DEUX IMAGES. L'image etait verifiee avant la campagne,
+pas apres. Elle l'est desormais des deux cotes, et une campagne incomplete n'ecrit plus
+de fichier — celui-la a ete retire, il aurait ete relu un jour comme une mesure.
+
+### Points ouverts
+
+1. **Neuf cas ne sont jamais servis** : mp-010, mp-021, mp-032, mp-034, mp-057, mp-070,
+   mp-103, mp-116, mp-129. Deux motifs identifies, aucun traite — la partie
+   LEGISLATIVE servie a la place de la REGLEMENTAIRE quand la question porte sur un
+   seuil ou un taux, et le bon article du MAUVAIS CCAG, le corpus en portant quatre
+   dont les articles sont numerotes pareil.
+2. **Huit cas ne sont jamais cites**, dont mp-069 et mp-124 ou le passage EST servi.
+3. Les points ouverts des lots precedents restent.

@@ -196,26 +196,25 @@ def create_fetch_handler(storage, workspace: WorkspaceConfig | None = None) -> C
                 "size": len(content_bytes),
                 "truncated": truncated,
             }
-            if truncated:
-                # LE MODELE LIT LA REPONSE, PAS LA DESCRIPTION DE L'OUTIL.
-                #
-                # `section` a ete ajoute, decrit, et transmis — le schema OpenAI le
-                # porte. Campagne suivante : 166 appels a cet outil, ZERO avec
-                # `section`. Il REAGIT en revanche a `truncated` : sur 202 appels, 74
-                # demandent 5 000 caracteres et 13 en demandent 10 000, apres avoir vu
-                # la troncature. Or augmenter la taille ne sert a rien, puisque c'est
-                # toujours la tete qu'on rend.
-                #
-                # Une capacite s'annonce donc la ou le besoin se manifeste, et non
-                # seulement en tete de contexte, parmi vingt autres outils.
-                _, titres = _extraire_la_section(content, "")
-                rendu["sections"] = titres[:80]
-                rendu["indication"] = (
-                    "Document tronqué : seul le début est rendu, et augmenter "
-                    "max_chars rendra plus de début, pas la suite recherchée. Pour "
-                    "lire un passage précis, rappeler fetch_document avec le "
-                    "paramètre section et l'un des titres listés ci-dessus."
-                )
+            # ON A ESSAYE D'ANNONCER `section` ICI, ET CELA N'A RIEN CHANGE.
+            #
+            # Le raisonnement etait bon : le modele lit le RESULTAT d'un outil et s'y
+            # adapte — sur 202 appels, 74 demandaient 5 000 caracteres et 13 en
+            # demandaient 10 000 apres avoir vu `truncated` — alors qu'il ne relit pas
+            # une description posee une fois en tete de contexte. La reponse tronquee
+            # portait donc les titres du document et une phrase disant que `max_chars`
+            # ne resoudrait rien et que `section` le resoudrait.
+            #
+            # Mesure, deux campagnes contre deux : 228 appels, ZERO avec `section`,
+            # p = 0,69 / 0,51 / 1,00 / 0,34. Le modele n'en a pas eu besoin — il tient
+            # ses passages de `search_documents`, qui rend deja leur section, et
+            # n'emploie `fetch_document` que pour elargir autour.
+            #
+            # Ces deux champs coutaient des jetons a chaque reponse tronquee pour un
+            # effet mesure nul : ils partent. Le parametre `section`, lui, reste — il
+            # ne coute rien tant qu'on ne l'emploie pas, et le defaut qu'il repare est
+            # reel : sans lui, un passage situe au milieu d'un document est
+            # inatteignable, quelle que soit la valeur de `max_chars`.
             return json.dumps(rendu, ensure_ascii=False)
 
         except Exception as exc:

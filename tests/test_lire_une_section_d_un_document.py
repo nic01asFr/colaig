@@ -116,43 +116,33 @@ def test_l_outil_annonce_la_section():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# LE MODELE LIT LA REPONSE DE L'OUTIL, PAS SA DESCRIPTION.
+# CE QU'ON A ESSAYE, ET QUI N'A RIEN CHANGE.
 #
-# `section` a ete ajoute, decrit, et transmis au modele — le schema OpenAI le porte.
-# Sur la campagne suivante : 166 appels a `fetch_document`, ZERO avec `section`.
+# Le raisonnement etait bon : le modele lit le RESULTAT d'un outil et s'y adapte —
+# sur 202 appels, 74 demandaient 5 000 caracteres et 13 en demandaient 10 000 apres
+# avoir vu `truncated` — alors qu'il ne relit pas une description posee une fois en
+# tete de contexte. La reponse tronquee a donc porte, un temps, les titres du document
+# et une phrase disant que `max_chars` ne resoudrait rien et que `section` le
+# resoudrait.
 #
-# Ce que la trace montre en revanche, c'est qu'il REAGIT a `truncated` : sur 202
-# appels, 74 demandent 5 000 caracteres et 13 en demandent 10 000, apres avoir vu la
-# troncature. Il lit donc le resultat et s'y adapte.
+# Mesure, deux campagnes contre deux : 228 appels a `fetch_document`, ZERO avec
+# `section`, p = 0,69 / 0,51 / 1,00 / 0,34. Le modele n'en a pas eu besoin — il tient
+# ses passages de `search_documents`, qui rend deja leur section, et n'emploie
+# `fetch_document` que pour elargir autour.
 #
-# Une capacite s'annonce donc la ou le besoin se manifeste — dans la reponse tronquee
-# elle-meme — et non seulement dans une description lue une fois, en tete de contexte,
-# parmi vingt autres outils.
+# Les deux champs coutaient des jetons a chaque reponse tronquee pour un effet mesure
+# nul : ils sont partis. Le parametre `section` reste, parce qu'il ne coute rien tant
+# qu'on ne l'emploie pas et que le defaut qu'il repare est reel.
+#
+# On garde la trace de l'essai : sans elle, quelqu'un le refera.
 # ─────────────────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
-async def test_une_reponse_tronquee_dit_ce_qu_elle_cache(handler):
+async def test_une_reponse_tronquee_le_dit_et_rien_de_plus(handler):
+    """L'annonce de `section` dans la reponse a ete mesuree sans effet, puis retiree."""
     lu = json.loads(await handler("096-besoin.md", max_chars=500))
 
     assert lu["truncated"] is True
-    assert "sections" in lu, "les titres disent ce que le document porte plus loin"
-    assert "Article R2111-8" in lu["sections"]
-
-
-@pytest.mark.asyncio
-async def test_une_reponse_tronquee_dit_comment_obtenir_la_suite(handler):
-    """Augmenter `max_chars` ne sert a rien : c'est toujours la tete qu'on rend."""
-    lu = json.loads(await handler("096-besoin.md", max_chars=500))
-
-    assert "section" in lu.get("indication", "").lower()
-
-
-@pytest.mark.asyncio
-async def test_une_reponse_entiere_ne_s_encombre_pas(handler):
-    """Rien a signaler quand rien ne manque."""
-    lu = json.loads(await handler("096-besoin.md", max_chars=100000))
-
-    assert lu["truncated"] is False
     assert "sections" not in lu
     assert "indication" not in lu
