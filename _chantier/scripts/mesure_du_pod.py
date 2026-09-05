@@ -262,7 +262,7 @@ def _demander(question: str, pause: float) -> tuple[str, float]:
 
 
 def main() -> int:
-    _verifier_le_montage()
+    image_initiale = _verifier_le_montage()
     negatifs_seuls = "--negatifs" in _ARGS
     # Isole par defaut : c'est la condition du jeu dore. `--fil` mesure l'autre.
     isole = "--fil" not in _ARGS
@@ -278,7 +278,7 @@ def main() -> int:
     print(f"pause    : {pause} s entre appels")
     print(f"vocabulaire du corpus : {len(_VOCABULAIRE)} identifiants\n")
 
-    resultats, latences = [], []
+    resultats, latences, echecs = [], [], []
     for i, c in enumerate(cas, 1):
         if isole:
             _purger_la_conversation()
@@ -286,6 +286,7 @@ def main() -> int:
             texte, duree = _demander(c["question"], pause)
         except Exception as e:  # noqa: BLE001
             print(f"  {c['id']} : echec ({type(e).__name__})", file=sys.stderr)
+            echecs.append(c["id"])
             continue
         latences.append(duree)
         resultats.append({
@@ -298,6 +299,25 @@ def main() -> int:
             "latence_s": round(duree, 1),
         })
         print(f"  {i}/{len(cas)} {c['id']} {duree:.1f}s", end="\r", flush=True)
+
+    # UNE CAMPAGNE INCOMPLETE NE REND PAS DE BILAN.
+    #
+    # Le 05/09/2026, un `helm upgrade` est tombe PENDANT une campagne : treize
+    # questions ont echoue au redemarrage du pod, et le harnais a affiche « 96/107 »
+    # sans dire qu'il manquait treize cas — ni que les autres se partageaient DEUX
+    # IMAGES. Un chiffre sorti d'un montage qui a change en cours de route ne mesure
+    # rien, et rien ne le disait.
+    if echecs:
+        print(f"CAMPAGNE INCOMPLETE — {len(echecs)} questions sans reponse : "
+              + " ".join(echecs[:20]), file=sys.stderr)
+    image_finale = _image_du_pod()
+    if image_finale != image_initiale:
+        print(f"MONTAGE CHANGE PENDANT LA CAMPAGNE — {image_initiale} au depart, "
+              f"{image_finale} a l'arrivee.", file=sys.stderr)
+    if echecs or image_finale != image_initiale:
+        raise SystemExit(
+            "Aucun bilan : les reponses obtenues ne portent pas toutes sur le meme "
+            "montage. Relancer sur un pod stable.")
 
     MESURES.mkdir(exist_ok=True)
     suffixe = ("negatifs" if negatifs_seuls else "complet") + ("" if isole else "-fil")
