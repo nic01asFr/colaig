@@ -171,6 +171,34 @@ extraEnv:
   # « auto » detecte par document : par article si le texte en porte, fenetre sinon.
   # CHANGER CE REGLAGE IMPOSE DE REINDEXER — l'index existant suit l'ancien decoupage.
   COLAIG_CHUNK_STRATEGIE: auto
+  # CONTEXTUALISATION DES PASSAGES — un prefixe de 1-2 phrases par chunk, ecrit par le
+  # LLM a l'indexation, qui situe l'extrait dans son document et son domaine.
+  #
+  # POURQUOI MAINTENANT, ET PAS « PARCE QUE C'EST ECRIT ». Le diagnostic des neuf cas
+  # qui echouent a tous les coups donne trois motifs, et deux d'entre eux sont des
+  # confusions que seul le CONTEXTE du passage peut lever :
+  #
+  #   le bon numero, le mauvais cahier
+  #     mp-129  attendu CCAG Travaux 3   servis CCAG Prestations intellectuelles 3 (x3)
+  #     mp-070  attendu R2112-3          servis CCAG Travaux 1, Marches industriels 1…
+  #     Le corpus porte QUATRE CCAG dont les articles sont numerotes pareil. Rien, dans
+  #     le texte d'un article, ne dit de quel cahier il vient.
+  #
+  #   la partie legislative pour la reglementaire
+  #     mp-010  attendu L2111-1  servi R2111-1     — un caractere d'ecart
+  #     mp-057  attendu L2111-1  servis R2111-4, R2121-1, R2121-3
+  #     Le principe est dans les « L », le chiffre dans les « R ».
+  #
+  # Le contextualiseur recoit deja le nom du document — verifie : il entre dans la
+  # balise, avec l'extrait. Un prefixe « CCAG Travaux, chapitre 1er » distingue donc ce
+  # que l'embedding du seul article ne distingue pas.
+  #
+  # CE QUE CELA COUTE : un appel LLM leger par chunk a l'indexation, soit 1149 pour cet
+  # espace, et une reindexation complete. Rien au moment de la question.
+  #
+  # PEREMPTION : deux campagnes contre deux. Si les motifs ci-dessus ne cedent pas, le
+  # reglage part comme sont partis l'elargissement aux voisins et le vivier elargi.
+  COLAIG_CONTEXTUAL_CHUNKING_ENABLED: "true"
   # LE BUDGET DOCUMENTAIRE, EN JETONS.
   #
   # Il valait 6000 CODE EN DUR, sur une fenetre de 131072 relevee sur l'endpoint le

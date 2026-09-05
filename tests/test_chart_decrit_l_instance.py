@@ -89,6 +89,10 @@ ENV_DE_L_INSTANCE = {
     # 131072 relevee sur l'endpoint. Il saturait avant les voisins comme apres.
     "COLAIG_BUDGET_JETONS": "6000",
     "COLAIG_CHUNK_STRATEGIE": "auto",
+    # Active le 05/09 : deux des trois motifs d'echec reproductible sont des
+    # confusions que seul le contexte du passage peut lever — le bon numero dans
+    # le mauvais CCAG, et la partie legislative pour la reglementaire.
+    "COLAIG_CONTEXTUAL_CHUNKING_ENABLED": "true",
     "ALBERT_MODEL_MEDIUM": "qwen3-6-35b-moe",
     "ALBERT_MODEL_LIGHT": "qwen3-6-35b-moe",
     "COLAIG_AUTO_DISCOVER_ENABLED": "true",
